@@ -642,5 +642,3 @@ func main() {
 		fmt.Printf("Error starting AssetManagementChaincode: %s", err)
 	}
 }
-
-
