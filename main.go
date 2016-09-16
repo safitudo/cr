@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	"github.com/hyperledger/fabric/core/crypto/primitives"
@@ -53,21 +54,59 @@ func (t *AssetManagementChaincode) Init(stub *shim.ChaincodeStub, function strin
 		return nil, errors.New("Failed creating AssetsOnwership table.")
 	}
 
+	// Create SupplierDirectory table
+	err = stub.CreateTable("SupplierDirectory", []*shim.ColumnDefinition{
+		&shim.ColumnDefinition{Name: "SupplierID", Type: shim.ColumnDefinition_STRING, Key: true},
+		&shim.ColumnDefinition{Name: "MetaData", Type: shim.ColumnDefinition_STRING, Key: false},
+	})
+	if err != nil {
+		return nil, errors.New("Failed creating SupplierDirectory table.")
+	}
+
+	// Create BuyerDirectory table
+	err = stub.CreateTable("BuyerDirectory", []*shim.ColumnDefinition{
+		&shim.ColumnDefinition{Name: "BuyerID", Type: shim.ColumnDefinition_STRING, Key: true},
+		&shim.ColumnDefinition{Name: "MetaData", Type: shim.ColumnDefinition_STRING, Key: false},
+	})
+	if err != nil {
+		return nil, errors.New("Failed creating BuyerDirectory table.")
+	}
+
+	// Create FunderDirectory table
+	err = stub.CreateTable("FunderDirectory", []*shim.ColumnDefinition{
+		&shim.ColumnDefinition{Name: "FunderID", Type: shim.ColumnDefinition_STRING, Key: true},
+		&shim.ColumnDefinition{Name: "MetaData", Type: shim.ColumnDefinition_STRING, Key: false},
+		&shim.ColumnDefinition{Name: "Criteria", Type: shim.ColumnDefinition_STRING, Key: false},
+	})
+	if err != nil {
+		return nil, errors.New("Failed creating FunderDirectory table.")
+	}
+
+	// Create FundingOperations table
+	err = stub.CreateTable("FundingOperations", []*shim.ColumnDefinition{
+		&shim.ColumnDefinition{Name: "OperationID", Type: shim.ColumnDefinition_STRING, Key: true},
+		&shim.ColumnDefinition{Name: "MetaData", Type: shim.ColumnDefinition_STRING, Key: false},
+		&shim.ColumnDefinition{Name: "Status", Type: shim.ColumnDefinition_INT32, Key: false},
+	})
+	if err != nil {
+		return nil, errors.New("Failed creating FunderDirectory table.")
+	}
+
 	// Set the admin
 	// The metadata will contain the certificate of the administrator
-	adminCert, err := stub.GetCallerMetadata()
-	if err != nil {
-		myLogger.Debug("Failed getting metadata")
-		return nil, errors.New("Failed getting metadata.")
-	}
-	if len(adminCert) == 0 {
-		myLogger.Debug("Invalid admin certificate. Empty.")
-		return nil, errors.New("Invalid admin certificate. Empty.")
-	}
-
-	myLogger.Debug("The administrator is [%x]", adminCert)
-
-	stub.PutState("admin", adminCert)
+	//adminCert, err := stub.GetCallerMetadata()
+	//if err != nil {
+	//	myLogger.Debug("Failed getting metadata")
+	//	return nil, errors.New("Failed getting metadata.")
+	//}
+	//if len(adminCert) == 0 {
+	//	myLogger.Debug("Invalid admin certificate. Empty.")
+	//	return nil, errors.New("Invalid admin certificate. Empty.")
+	//}
+	//
+	//myLogger.Debug("The administrator is [%x]", adminCert)
+	//
+	//stub.PutState("admin", adminCert)
 
 	myLogger.Debug("Init Chaincode...done")
 
@@ -187,6 +226,284 @@ func (t *AssetManagementChaincode) transfer(stub *shim.ChaincodeStub, args []str
 	return nil, nil
 }
 
+func (t *AssetManagementChaincode) createSupplier(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Create Supplier...")
+
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2")
+	}
+
+	// Metadata for describing basic information of supplier, like industry type, sensitive data hashed with salt
+	uuid := args[0]
+	metaData := args[1]
+
+	// Verify the identity of the caller
+	// Only an administrator can
+	//adminCertificate, err := stub.GetState("admin")
+	//if err != nil {
+	//	return nil, errors.New("Failed fetching admin identity")
+	//}
+	//
+	//ok, err := t.isCaller(stub, adminCertificate)
+	//if err != nil {
+	//	return nil, errors.New("Failed checking admin identity")
+	//}
+	//if !ok {
+	//	return nil, errors.New("The caller is not an administrator")
+	//}
+
+	_, err := stub.InsertRow(
+		"SupplierDirectory",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+			},
+		})
+	if err != nil {
+		return nil, errors.New("Failed inserting row.")
+	}
+
+	myLogger.Debug("Create Supplier...done")
+
+	return nil, nil
+}
+
+func (t *AssetManagementChaincode) updateSupplier(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Update Supplier...")
+
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2")
+	}
+
+	uuid := args[0]
+	metaData := args[1]
+
+	// Verify the identity of the caller
+	// Only an administrator can
+	//adminCertificate, err := stub.GetState("admin")
+	//if err != nil {
+	//	return nil, errors.New("Failed fetching admin identity")
+	//}
+	//
+	//ok, err := t.isCaller(stub, adminCertificate)
+	//if err != nil {
+	//	return nil, errors.New("Failed checking admin identity")
+	//}
+	//if !ok {
+	//	return nil, errors.New("The caller is not an administrator")
+	//}
+
+	// At this point, the proof of ownership is valid, then update
+	ok, err := stub.ReplaceRow(
+		"SupplierDirectory",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("Failed replacing row [%s]", err)
+	}
+	if !ok {
+		return nil, errors.New("Failed replacing row.")
+	}
+
+	myLogger.Debug("Update Supplier...done")
+
+	return nil, nil
+}
+
+func (t *AssetManagementChaincode) createBuyer(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Create Buyer...")
+
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2")
+	}
+
+	// Metadata for describing basic information of buyer, sensitive data hashed with salt
+	uuid := args[0]
+	metaData := args[1]
+
+	_, err := stub.InsertRow(
+		"BuyerDirectory",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+			},
+		})
+	if err != nil {
+		return nil, errors.New("Failed inserting row.")
+	}
+
+	myLogger.Debug("Create Buyer...done")
+
+	return nil, nil
+}
+
+func (t *AssetManagementChaincode) updateBuyer(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Update Buyer...")
+
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2")
+	}
+
+	uuid := args[0]
+	metaData := args[1]
+
+	// At this point, the proof of ownership is valid, then update
+	ok, err := stub.ReplaceRow(
+		"BuyerDirectory",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("Failed replacing row [%s]", err)
+	}
+	if !ok {
+		return nil, errors.New("Failed replacing row.")
+	}
+
+	myLogger.Debug("Update Buyer...done")
+
+	return nil, nil
+}
+
+func (t *AssetManagementChaincode) createFunder(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Create Funder...")
+
+	if len(args) != 3 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 3")
+	}
+
+	// Metadata for describing basic information of funder, like industry type, sensitive data hashed with salt
+	// Criteria for approving funding requests (funding operations) - hashaed with salt.
+	uuid := args[0]
+	metaData := args[1]
+	criteria := args[2]
+
+	_, err := stub.InsertRow(
+		"FunderDirectory",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+				&shim.Column{Value: &shim.Column_String_{String_: criteria}},
+			},
+		})
+	if err != nil {
+		return nil, errors.New("Failed inserting row.")
+	}
+
+	myLogger.Debug("Create Funder...done")
+
+	return nil, nil
+}
+
+func (t *AssetManagementChaincode) updateFunder(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Update Funder...")
+
+	if len(args) != 3 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 3")
+	}
+
+	uuid := args[0]
+	metaData := args[1]
+	criteria := args[2]
+
+	// At this point, the proof of ownership is valid, then update
+	ok, err := stub.ReplaceRow(
+		"FunderDirectory",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+				&shim.Column{Value: &shim.Column_String_{String_: criteria}},
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("Failed replacing row [%s]", err)
+	}
+	if !ok {
+		return nil, errors.New("Failed replacing row.")
+	}
+
+	myLogger.Debug("Update Funder...done")
+
+	return nil, nil
+}
+
+func (t *AssetManagementChaincode) createOperation(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Create Operation...")
+
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2")
+	}
+
+	// Metadata of operation
+	uuid := args[0]
+	metaData := args[1]
+	status := int32(0)
+
+	_, err := stub.InsertRow(
+		"FundingOperations",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+				&shim.Column{Value: &shim.Column_Int32{Int32: status}},
+			},
+		})
+	if err != nil {
+		return nil, errors.New("Failed inserting row.")
+	}
+
+	myLogger.Debug("Create Operation...done")
+
+	return nil, nil
+}
+
+func (t *AssetManagementChaincode) updateOperation(stub *shim.ChaincodeStub, args []string) ([]byte, error) {
+	myLogger.Debug("Update Operation...")
+
+	if len(args) != 3 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 3")
+	}
+
+	uuid := args[0]
+	metaData := args[1]
+	statusStr := args[2]
+	// need convert string to int32
+	i, _ := strconv.ParseInt(statusStr, 0, 32)
+	status := int32(i)
+
+	// At this point, the proof of ownership is valid, then update
+	ok, err := stub.ReplaceRow(
+		"FundingOperations",
+		shim.Row{
+			Columns: []*shim.Column{
+				&shim.Column{Value: &shim.Column_String_{String_: uuid}},
+				&shim.Column{Value: &shim.Column_String_{String_: metaData}},
+				&shim.Column{Value: &shim.Column_Int32{Int32: status}},
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("Failed replacing row [%s]", err)
+	}
+	if !ok {
+		return nil, errors.New("Failed replacing row.")
+	}
+
+	myLogger.Debug("Update Operation...done")
+
+	return nil, nil
+}
+
 func (t *AssetManagementChaincode) isCaller(stub *shim.ChaincodeStub, certificate []byte) (bool, error) {
 	myLogger.Debug("Check caller...")
 
@@ -251,6 +568,30 @@ func (t *AssetManagementChaincode) Invoke(stub *shim.ChaincodeStub, function str
 	} else if function == "transfer" {
 		// Transfer ownership
 		return t.transfer(stub, args)
+	} else if function == "createSupplier" {
+		// create Supplier
+		return t.createSupplier(stub, args)
+	} else if function == "updateSupplier" {
+		// update Supplier
+		return t.updateSupplier(stub, args)
+	} else if function == "createBuyer" {
+		// create Buyer
+		return t.createBuyer(stub, args)
+	} else if function == "updateBuyer" {
+		// update Buyer
+		return t.updateBuyer(stub, args)
+	} else if function == "createFunder" {
+		// create Funder
+		return t.createFunder(stub, args)
+	} else if function == "updateFunder" {
+		// update Funder
+		return t.updateFunder(stub, args)
+	} else if function == "createOperation" {
+		// create Operation
+		return t.createOperation(stub, args)
+	} else if function == "updateOperation" {
+		// update Operation
+		return t.updateOperation(stub, args)
 	}
 
 	return nil, errors.New("Received unknown function invocation")
@@ -264,7 +605,7 @@ func (t *AssetManagementChaincode) Query(stub *shim.ChaincodeStub, function stri
 	myLogger.Debugf("Query [%s]", function)
 
 	if function != "query" {
-		return nil, errors.New("Invalid query function name. Expecting 'query' but found '" + function + "'")
+		return nil, errors.New("Invalid query function name. Expecting \"query\"")
 	}
 
 	var err error
